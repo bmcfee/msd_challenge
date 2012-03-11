@@ -1,0 +1,37 @@
+
+SubmissionUtils/README
+======================
+
+  T. Bertin-Mahieux (2012) Columbia University
+  tb2332@columbia.edu
+
+Scripts to help you prepare and validate your Kaggle submission file
+for the MSD Challenge.
+
+
+SCRIPT 1: Submission validation
+--------
+
+TODO
+
+
+
+SCRIPT 2: From song IDs to song indexes
+--------
+
+All the data is release with song IDs, e.g. 'SOAAADD12AB018A9DD', so it is
+natural to have a prediction file with one user and many song IDs per line, e.g.
+    user1     SOABC     SODEF    SOGHI    .....
+Problem: to predict many thousand songs per user, it makes a very large text
+file, difficult to upload to Kaggle.
+Therefoore, Kaggle expect a file containing 'song ID' IDs, which are an
+integer. The mapping (song ID -> integer) is available in the file:
+   'kaggle_songs.txt'  on the Kaggle's challenge page.
+
+The following codes download the mapping, and convert your file for you:
+
+   python convert_to_song_index.py  <prediction file> <submission file>
+where
+   <prediction file>    contains 'SOAAADD12AB018A9DD'
+   <submission file>    contains integers
+
