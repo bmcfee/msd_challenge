@@ -87,6 +87,8 @@ def validate_one_line(line, line_num, min_max_song_indexes):
         msg += "found: %s" % parts[0][:50]
         print_error_message(msg, line_num)
         is_valid = False
+    for song_index in parts[1:]:
+        if not 
     # TODO check if songs are integers
     # TODO check if there are duplicate songs
     # TODO check song indexes
@@ -141,12 +143,17 @@ if __name__ == '__main__':
     users = load_list_from_the_web(CANONICAL_USER_LIST)
     songs_and_indexes = load_list_from_the_web(CANONICAL_SONG_LIST)
 
+    # Check user file.
+    assert len(users) == 110000, 'Problem with the online user file.'
+    for user in users:
+        assert len(user) == 40, 'Problem with the online user file (user: %s).' % user
+
     # Extract indexes from the list of songs.
     indexes = [int(line.split(' ')[1]) for line in songs_and_indexes]
     min_index = min(indexes)
     max_index = max(indexes)
     msg_song_file_prob = 'Problem with the online song file, aborting.'
-    assert min_index > 0, msg_song_file_prob
+    assert min_index == 1, msg_song_file_prob
     assert max_index == len(indexes), msg_song_file_prob
     min_max_index = (min, max)
 
