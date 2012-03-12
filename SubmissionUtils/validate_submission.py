@@ -69,6 +69,8 @@ def print_error_message(msg, line_num=None):
 def validate_one_line(line, line_num, min_max_song_indexes):
     """Make sure an individual line looks valid, return True if so."""
     is_valid = True
+    min_index, max_index = min_max_song_indexes
+    assert min_index == 1, 'Problem, minimum song index is not 1.'
     # Line too small or empty?
     if len(line) < 80:
         print_error_message("Line too short! (%d characters)" % len(line),
@@ -88,21 +90,52 @@ def validate_one_line(line, line_num, min_max_song_indexes):
         print_error_message(msg, line_num)
         is_valid = False
     for song_index in parts[1:]:
-        if not 
-    # TODO check if songs are integers
-    # TODO check if there are duplicate songs
-    # TODO check song indexes
+        # Is the song an integer?
+        try:
+            index = int(song_index)
+        except ValueError:
+            if len(song_index) == 18 and song_index[:2] == 'SO':
+                msg = 'Predicted songs should be integers, not SO...'
+                msg += 'Found: %s' % song_index
+                print_error_message(msg, line_num)
+            else:
+                msg = 'Found non-integer song ID: %s' % song_index
+                print_error_message(msg, line_num)
+            is_valid = False
+            break
+        # Is it 0-indexed instead of 1?
+        if index == 0:
+            msg = 'Found song index 0, song indexes start at 1.'
+            print_error_message(msg, line_num)
+            is_valid = False
+            break
+        # Is the index a valid integer?
+        elif index < 1 or index > max_index:
+            msg = 'Found song index %d, ' % index
+            msg += 'it should be between 1 and %d.' % max_index
+            print_error_message(msg, line_num)
+            is_valid = False
+            break
+    # Are there song duplicates?
+    if is_valid:
+        if len(set(parts[1:])) != len(parts[1:]):
+            msg = 'There is at least one song ID duplicate.'
+            print_error_message(msg, line_num)
+            is_valid = False
+    # Done.
     return is_valid
 
 
 def validate_user_list(canonical_list, seen_list):
     """Validate that we saw the right users, in order."""
     is_valid = True
+    # Size mismatch?
     if len(canonical_list) != len(seen_list):
         msg = 'Predictions made for %d users, ' % len(seen_list)
         msg += 'there should be %d users.' % len(canonical_list)
         print_error_message(msg)
         is_valid = False
+    # Ordering mismatch?
     for k in xrange(min(len(canonical_list), len(seen_list))):
         u1 = canonical_list[k]
         u2 = seen_list[k]
@@ -155,7 +188,7 @@ if __name__ == '__main__':
     msg_song_file_prob = 'Problem with the online song file, aborting.'
     assert min_index == 1, msg_song_file_prob
     assert max_index == len(indexes), msg_song_file_prob
-    min_max_index = (min, max)
+    min_max_index = (min_index, max_index)
 
     # Keep stats
     is_valid = True
@@ -172,7 +205,7 @@ if __name__ == '__main__':
         users_seen.append(line.split(' ')[0])
 
 
-
+    # Validate that we predicted for the right users in the right order.
     is_valid = validate_user_list(users, users_seen)
     if not is_valid:
         sys.exit(0)
