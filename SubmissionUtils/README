@@ -12,7 +12,14 @@ for the MSD Challenge.
 SCRIPT 1: Submission validation
 --------
 
-TODO
+This script download canonical files from the web (user and songs)
+and verify that the submission has the right format:
+- 110K x 500, space-separated integers
+- no duplicates per line
+- integers are plausible song indexes
+
+   python validate_submission.py help
+   python validate_submission.py <submission file>
 
 
 
