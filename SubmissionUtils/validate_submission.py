@@ -30,21 +30,22 @@ import os
 import sys
 import time
 import urllib2
-import numpy as np
 
 
 # Number of predicted songs required per user.
-CUTOFF = 2000
+CUTOFF = 500
 
+# Million Song Dataset website file directory.
+HTML_PREFIX = 'http://labrosa.ee.columbia.edu/millionsong/sites/default/files/'
 
 # Canonical list of users for the contest, there should be predictions for
 # each user, one user per line, users are in the same order as in this file.
-CANONICAL_USER_LIST = 'http://labrosa.ee.columbia.edu/millionsong/sites/default/files/challenge/canonical/kaggle_users.txt'
+CANONICAL_USER_LIST = '%s%s' % (HTML_PREFIX,
+                                'challenge/canonical/kaggle_users.txt')
 
 # Canonical list of songs and their integer index.
-CANONICAL_SONG_LIST = 'http://labrosa.ee.columbia.edu/millionsong/sites/default/files/challenge/canonical/kaggle_songs.txt'
-
-
+CANONICAL_SONG_LIST = '%s%s' % (HTML_PREFIX,
+                                'challenge/canonical/kaggle_songs.txt')
 
 
 def load_list_from_the_web(url):
@@ -52,7 +53,7 @@ def load_list_from_the_web(url):
     print '---retrieveing url %s...' % url
     t1 = time.time()
     stream = urllib2.urlopen(url)
-    data = [line.strip() for line in stream.readlines()]
+    data = [l.strip() for l in stream.readlines()]
     stream.close()
     print '    DONE! It took %d seconds.' % int(time.time() - t1)
     return data
@@ -72,24 +73,18 @@ def validate_one_line(line, line_num, min_max_song_indexes):
     min_index, max_index = min_max_song_indexes
     assert min_index == 1, 'Problem, minimum song index is not 1.'
     # Line too small or empty?
-    if len(line) < 80:
+    if len(line) < 500:
         print_error_message("Line too short! (%d characters)" % len(line),
                             line_num)
         is_valid = False
     parts = line.split(' ')
     # Not the right number of items per line?
-    if len(parts) != CUTOFF + 1:
-        msg = "Line should have %d one-space-separated elements, " % (CUTOFF + 1, )
+    if len(parts) != CUTOFF:
+        msg = "Line should have %d one-space-separated elements, " % CUTOFF
         msg += "found %d" % len(parts)
         print_error_message(msg, line_num)
         is_valid = False
-    # First item is not a proper user ID?
-    if len(parts[0]) != 40:
-        msg = "First line item should be a 40-character user id, "
-        msg += "found: %s" % parts[0][:50]
-        print_error_message(msg, line_num)
-        is_valid = False
-    for song_index in parts[1:]:
+    for song_index in parts:
         # Is the song an integer?
         try:
             index = int(song_index)
@@ -126,30 +121,64 @@ def validate_one_line(line, line_num, min_max_song_indexes):
     return is_valid
 
 
-def validate_user_list(canonical_list, seen_list):
-    """Validate that we saw the right users, in order."""
-    is_valid = True
-    # Size mismatch?
-    if len(canonical_list) != len(seen_list):
-        msg = 'Predictions made for %d users, ' % len(seen_list)
-        msg += 'there should be %d users.' % len(canonical_list)
-        print_error_message(msg)
-        is_valid = False
-    # Ordering mismatch?
-    for k in xrange(min(len(canonical_list), len(seen_list))):
-        u1 = canonical_list[k]
-        u2 = seen_list[k]
-        if u1 != u2:
-            msg = 'Expected user \'%s\', got user \'%s\'.' % (u1, u2)
-            is_valid = False
-            break
-    return is_valid
+def main(argv):
+    """Validate the submission from canonical files fetched online."""
 
+    # Sanity check on the file.
+    submission_filename = argv[1]
+    if not os.path.isfile(submission_filename):
+        print 'ERROR: file %s does not exist.' % submission_filename
+        die_with_usage()
+
+    # Fetch data files.
+    users = load_list_from_the_web(CANONICAL_USER_LIST)
+    songs_and_indexes = load_list_from_the_web(CANONICAL_SONG_LIST)
+
+    # Check user file.
+    assert len(users) == 110000, 'Problem with the online user file.'
+    for user in users:
+        assert len(user) == 40, '%s' % (
+            'Problem with the online user file (user: %s).' % user, )
+
+    print '***************************************'
+    print '**********ANALYZING SUBMISSION*********'
+
+    # Extract indexes from the list of songs.
+    indexes = [int(line.split(' ')[1]) for line in songs_and_indexes]
+    min_index = min(indexes)
+    max_index = max(indexes)
+    msg_song_file_prob = 'Problem with the online song file, aborting.'
+    assert min_index == 1, msg_song_file_prob
+    assert max_index == len(indexes), msg_song_file_prob
+    min_max_index = (min_index, max_index)
+
+    # Keep stats
+    submission_is_valid = True
+
+    # Go through each line, validates it, keep some stats.
+    line_number = 0
+    fIn = open(submission_filename, 'r')
+    for line in fIn.xreadlines():
+        line_number += 1
+        submission_is_valid = validate_one_line(line.strip(),
+                                                line_number,
+                                                min_max_index)
+        if not submission_is_valid:
+            fIn.close()
+            sys.exit(0)
+    fIn.close()
+
+    # Final message.
+    if submission_is_valid:
+        print '***************************************'
+        print 'Awesome, your submission is good to go!'
+        sys.exit(0)    
 
 
 def die_with_usage():
     """Help menu."""
     print 'MSD CHallenge: script to validate your submission to Kaggle.'
+    print '(you need an internet connection)'
     print '------------------------------------------------------------'
     print ''
     print 'python validate_submission.py <submission file>'
@@ -162,57 +191,10 @@ def die_with_usage():
 if __name__ == '__main__':
 
     # Display the help menu and quit?
-    help_keywords = ('help', '-help', '--help')
-    if len(sys.argv) < 2 or sys.argv[1].lower() in help_keywords:
+    HELP_KEYWORDS = ('help', '-help', '--help')
+    if len(sys.argv) < 2 or sys.argv[1].lower() in HELP_KEYWORDS:
         die_with_usage()
 
-    # Sanity check on the file.
-    submission_filename = sys.argv[1]
-    if not os.path.isfile(submission_filename):
-        print 'ERROR: file %s does not exist.' % submission_filename
-        die_with_usage()
-
-    # Fetch data files.
-    users = load_list_from_the_web(CANONICAL_USER_LIST)
-    songs_and_indexes = load_list_from_the_web(CANONICAL_SONG_LIST)
-
-    # Check user file.
-    assert len(users) == 110000, 'Problem with the online user file.'
-    for user in users:
-        assert len(user) == 40, 'Problem with the online user file (user: %s).' % user
-
-    # Extract indexes from the list of songs.
-    indexes = [int(line.split(' ')[1]) for line in songs_and_indexes]
-    min_index = min(indexes)
-    max_index = max(indexes)
-    msg_song_file_prob = 'Problem with the online song file, aborting.'
-    assert min_index == 1, msg_song_file_prob
-    assert max_index == len(indexes), msg_song_file_prob
-    min_max_index = (min_index, max_index)
-
-    # Keep stats
-    is_valid = True
-    users_seen = []
-
-    # Go through each line, validates it, keep some stats.
-    line_num = 0
-    f = open(submission_filename, 'r')
-    for line in f.xreadlines():
-        line_num += 1
-        is_valid = validate_one_line(line.strip(), line_num, min_max_index)
-        if not is_valid:
-            sys.exit(0)
-        users_seen.append(line.split(' ')[0])
+    main(sys.argv)
 
 
-    # Validate that we predicted for the right users in the right order.
-    is_valid = validate_user_list(users, users_seen)
-    if not is_valid:
-        sys.exit(0)
-
-
-    # Final message.
-    if is_valid:
-        print '***************************************'
-        print 'Awesome, your submission is good to go!'
-        sys.exit(0)
